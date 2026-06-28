@@ -31,6 +31,83 @@ async function run() {
         const booksCollections = db.collection("books")
 
 
+        app.get("/api/books", async (req, res) => {
+            try {
+                const { search, category, sort } = req.query;
+
+                // Query Object
+                const query = {
+                    status: "published",
+                };
+
+                // Search
+                if (search) {
+                    query.title = {
+                        $regex: search,
+                        $options: "i",
+                    };
+                }
+
+                // Category Filter
+                if (category) {
+                    query.category = category;
+                }
+
+                // Sorting
+                let sortOption = {
+                    createdAt: -1,
+                };
+
+                switch (sort) {
+                    case "fee-asc":
+                        sortOption = {
+                            deliveryFee: 1,
+                        };
+                        break;
+
+                    case "fee-desc":
+                        sortOption = {
+                            deliveryFee: -1,
+                        };
+                        break;
+
+                    case "oldest":
+                        sortOption = {
+                            createdAt: 1,
+                        };
+                        break;
+
+                    case "newest":
+                        sortOption = {
+                            createdAt: -1,
+                        };
+                        break;
+
+                    default:
+                        sortOption = {
+                            createdAt: -1,
+                        };
+                }
+
+                const books = await booksCollections
+                    .find(query)
+                    .sort(sortOption)
+                    .toArray();
+
+                res.status(200).send({
+                    success: true,
+                    total: books.length,
+                    books,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
         // add book related api 
 
         app.get("/api/dashboard/librarian/overview", async (req, res) => {
