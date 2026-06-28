@@ -15,6 +15,7 @@ const port = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json())
 const uri = process.env.MONGODB_URI;
+
 console.log(uri)
 const client = new MongoClient(uri, {
     serverApi: {
@@ -28,11 +29,34 @@ async function run() {
 
 
         const db = client.db("bibilio_db")
+        console.log("Database:", db.databaseName);
         const booksCollections = db.collection("books")
-        const usersCollections = db.collection("users");
+        const usersCollections = db.collection("user");
         const deliveryCollections = db.collection("bookRequests");
         const paymentCollections = db.collection("payments");
 
+        // users related api 
+        app.get("/api/admin/user", async (req, res) => {
+            try {
+                const users = await usersCollections
+                    .find({})
+                    .sort({ createdAt: -1 })
+                    .toArray();
+                console.log(users);
+
+                res.status(200).send({
+                    success: true,
+                    users,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
         //pending related api 
         app.get("/api/admin/pending-books", async (req, res) => {
             try {
@@ -120,7 +144,7 @@ async function run() {
             }
         });
 
-        app.patch("/api/admin/users/:id", async (req, res) => {
+        app.patch("/api/admin/user/:id", async (req, res) => {
             try {
                 const { id } = req.params;
                 const { role } = req.body;
@@ -158,7 +182,7 @@ async function run() {
             }
         });
 
-        app.delete("/api/admin/users/:id", async (req, res) => {
+        app.delete("/api/admin/user/:id", async (req, res) => {
             try {
                 const { id } = req.params;
 
