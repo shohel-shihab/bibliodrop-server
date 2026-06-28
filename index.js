@@ -1,3 +1,5 @@
+const dns = require("node:dns");
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 const express = require('express');
 require('dotenv').config()
 const cors = require("cors")
@@ -12,7 +14,7 @@ const port = process.env.PORT || 5000
 //middleware 
 app.use(cors())
 app.use(express.json())
-const uri =process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI;
 console.log(uri)
 const client = new MongoClient(uri, {
     serverApi: {
@@ -23,6 +25,51 @@ const client = new MongoClient(uri, {
 });
 async function run() {
     try {
+
+
+        const db = client.db("bibilio_db")
+        const booksCollections = db.collection("books")
+
+        app.post("/api/books", async (req, res) => {
+            try {
+                const bookData = req.body;
+        
+                // Create Book Object
+                const newBook = {
+                    title: bookData.title,
+                    author: bookData.author,
+                    description: bookData.description,
+                    category: bookData.category,
+                    image: bookData.image,
+                    deliveryFee: Number(bookData.deliveryFee),
+
+                    // Default values
+                    status: "Pending Approval",
+                    totalRequests: 0,
+
+                    // Librarian Information
+                    librarianId: bookData.librarianId,
+                    librarianName: bookData.librarianName,
+                    librarianEmail: bookData.librarianEmail,
+                    createdAt: new Date(),
+                };
+
+                const result = await booksCollections.insertOne(newBook);
+
+                res.status(201).json({
+                    success: true,
+                    message: "Book added successfully.",
+                    insertedId: result.insertedId,
+                });
+            } catch (error) {
+                console.error(error);
+
+                res.status(500).json({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         // Send a ping to confirm a successful connection
@@ -30,7 +77,7 @@ async function run() {
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
-       // await client.close();
+        // await client.close();
     }
 }
 run().catch(console.dir);
