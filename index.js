@@ -30,10 +30,67 @@ async function run() {
         const db = client.db("bibilio_db")
         const booksCollections = db.collection("books")
 
+
+        // add book related api 
+
+        app.get("/api/dashboard/librarian/overview", async (req, res) => {
+            try {
+                const email = req.query.email;
+
+                if (!email) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Email is required",
+                    });
+                }
+
+                // All books of this librarian
+                const books = await booksCollections
+                    .find({
+                        librarianEmail: email,
+                    })
+                    .toArray();
+
+                // Statistics
+                const totalBooks = books.length;
+
+                const publishedBooks = books.filter(
+                    (book) => book.status === "Published"
+                ).length;
+
+                const pendingBooks = books.filter(
+                    (book) => book.status === "Pending Approval"
+                ).length;
+
+                const unpublishedBooks = books.filter(
+                    (book) => book.status === "Unpublished"
+                ).length;
+
+                res.send({
+                    success: true,
+
+                    stats: {
+                        totalBooks,
+                        publishedBooks,
+                        pendingBooks,
+                        unpublishedBooks,
+                    },
+
+                    books,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
         app.post("/api/books", async (req, res) => {
             try {
                 const bookData = req.body;
-        
+
                 // Create Book Object
                 const newBook = {
                     title: bookData.title,
@@ -70,6 +127,41 @@ async function run() {
                 });
             }
         });
+
+        app.get("/api/books/my-books", async (req, res) => {
+            try {
+                const email = req.query.email;
+
+                if (!email) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Email is required",
+                    });
+                }
+
+                const books = await booksCollections
+                    .find({
+                        librarianEmail: email,
+                    })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    books,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
         // Send a ping to confirm a successful connection
