@@ -37,6 +37,7 @@ async function run() {
 
 
 
+
         // manage books related api
 
         app.get("/api/admin/books", async (req, res) => {
@@ -62,6 +63,39 @@ async function run() {
                 });
             }
         });
+
+
+        app.patch("/api/admin/books/:id/approve", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                const result = await booksCollections.updateOne(
+                    {
+                        _id: new ObjectId(id),
+                    },
+                    {
+                        $set: {
+                            status: "Published",
+                        },
+                    }
+                );
+
+                res.send({
+                    success: true,
+                    modifiedCount: result.modifiedCount,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                });
+            }
+        });
+
+
+
+
 
         app.patch("/api/admin/books/:id/unpublish", async (req, res) => {
 
@@ -294,12 +328,10 @@ async function run() {
             try {
                 const { search, category, sort } = req.query;
 
-                // Query Object
                 const query = {
-                    status: "published",
+                    status: "Published",
                 };
 
-                // Search
                 if (search) {
                     query.title = {
                         $regex: search,
@@ -307,45 +339,29 @@ async function run() {
                     };
                 }
 
-                // Category Filter
                 if (category) {
                     query.category = category;
                 }
 
-                // Sorting
                 let sortOption = {
                     createdAt: -1,
                 };
 
                 switch (sort) {
                     case "fee-asc":
-                        sortOption = {
-                            deliveryFee: 1,
-                        };
+                        sortOption = { deliveryFee: 1 };
                         break;
 
                     case "fee-desc":
-                        sortOption = {
-                            deliveryFee: -1,
-                        };
+                        sortOption = { deliveryFee: -1 };
                         break;
 
                     case "oldest":
-                        sortOption = {
-                            createdAt: 1,
-                        };
-                        break;
-
-                    case "newest":
-                        sortOption = {
-                            createdAt: -1,
-                        };
+                        sortOption = { createdAt: 1 };
                         break;
 
                     default:
-                        sortOption = {
-                            createdAt: -1,
-                        };
+                        sortOption = { createdAt: -1 };
                 }
 
                 const books = await booksCollections
@@ -353,11 +369,11 @@ async function run() {
                     .sort(sortOption)
                     .toArray();
 
-                res.status(200).send({
+                res.send({
                     success: true,
-                    total: books.length,
                     books,
                 });
+
             } catch (error) {
                 console.log(error);
 
@@ -367,32 +383,67 @@ async function run() {
                 });
             }
         });
-
-
-        app.get("/api/books/:id", async (req, res) => {
+        app.get("/api/books/featured", async (req, res) => {
             try {
-                const { id } = req.params;
 
-                if (!ObjectId.isValid(id)) {
-                    return res.status(400).send({
-                        success: false,
-                        message: "Invalid Book ID"
-                    });
-                }
-
-                const book = await booksCollections.findOne({
-                    _id: new ObjectId(id)
-                });
+                const featuredBooks = await booksCollections
+                    .find({
+                        status: "Published",
+                    })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .limit(6)
+                    .toArray();
 
                 res.send({
                     success: true,
-                    book
+                    books: featuredBooks,
                 });
 
             } catch (error) {
+
                 console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+
             }
         });
+
+        app.get("/api/books/my-books", async (req, res) => {
+            try {
+
+                const email = req.query.email;
+
+                const books = await booksCollections
+                    .find({
+                        librarianEmail: email,
+                    })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    books,
+                });
+
+            } catch (error) {
+
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+
+            }
+        });
+
         // add book related api 
 
         app.get("/api/dashboard/librarian/overview", async (req, res) => {
@@ -490,68 +541,52 @@ async function run() {
             }
         });
 
-        app.get("/api/books/my-books", async (req, res) => {
+        app.get("/api/books/:id", async (req, res) => {
             try {
-                const email = req.query.email;
 
-                if (!email) {
+                const { id } = req.params;
+
+                if (!ObjectId.isValid(id)) {
                     return res.status(400).send({
                         success: false,
-                        message: "Email is required",
+                        message: "Invalid Book ID",
                     });
                 }
 
-                const books = await booksCollections
-                    .find({
-                        librarianEmail: email,
-                    })
-                    .sort({
-                        createdAt: -1,
-                    })
-                    .toArray();
+                const book = await booksCollections.findOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (!book) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "Book not found",
+                    });
+                }
 
                 res.send({
                     success: true,
-                    books,
+                    book,
                 });
+
             } catch (error) {
+
                 console.log(error);
 
                 res.status(500).send({
                     success: false,
                     message: "Internal Server Error",
                 });
+
             }
         });
 
 
 
-        // feature related api 
-        app.get("/api/books/featured", async (req, res) => {
-            try {
-                const featuredBooks = await booksCollections
-                    .find({
-                        status: "Published",
-                    })
-                    .sort({
-                        createdAt: -1,
-                    })
-                    .limit(6)
-                    .toArray();
 
-                res.send({
-                    success: true,
-                    books: featuredBooks,
-                });
-            } catch (error) {
-                console.log(error);
 
-                res.status(500).send({
-                    success: false,
-                    message: "Internal Server Error",
-                });
-            }
-        });
+
+
 
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
