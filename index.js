@@ -33,7 +33,31 @@ async function run() {
         const deliveryCollections = db.collection("bookRequests");
         const paymentCollections = db.collection("payments");
 
+        //pending related api 
+        app.get("/api/admin/pending-books", async (req, res) => {
+            try {
+                const books = await booksCollections
+                    .find({
+                        status: "Pending Approval",
+                    })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .toArray();
 
+                res.status(200).send({
+                    success: true,
+                    books,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
         // admin related api 
         app.get("/api/dashboard/admin/overview", async (req, res) => {
             try {
@@ -86,6 +110,80 @@ async function run() {
                     categories: categoryData,
                 });
 
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
+        app.patch("/api/admin/users/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+                const { role } = req.body;
+
+                if (!ObjectId.isValid(id)) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Invalid User ID",
+                    });
+                }
+
+                const result = await usersCollections.updateOne(
+                    {
+                        _id: new ObjectId(id),
+                    },
+                    {
+                        $set: {
+                            role: role,
+                        },
+                    }
+                );
+
+                res.send({
+                    success: true,
+                    message: "User role updated successfully.",
+                    modifiedCount: result.modifiedCount,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
+        app.delete("/api/admin/users/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                if (!ObjectId.isValid(id)) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Invalid User ID",
+                    });
+                }
+
+                const result = await usersCollections.deleteOne({
+                    _id: new ObjectId(id),
+                });
+
+                if (result.deletedCount === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "User not found",
+                    });
+                }
+
+                res.send({
+                    success: true,
+                    message: "User deleted successfully.",
+                });
             } catch (error) {
                 console.log(error);
 
