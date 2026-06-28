@@ -35,6 +35,76 @@ async function run() {
         const deliveryCollections = db.collection("bookRequests");
         const paymentCollections = db.collection("payments");
 
+
+
+        // manage books related api
+
+        app.get("/api/admin/books", async (req, res) => {
+            try {
+                const books = await booksCollections
+                    .find({})
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    books,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
+        app.patch("/api/admin/books/:id/unpublish", async (req, res) => {
+
+            const { id } = req.params;
+
+            const result = await booksCollections.updateOne(
+
+                {
+                    _id: new ObjectId(id)
+                },
+
+                {
+                    $set: {
+                        status: "Unpublished"
+                    }
+                }
+
+            );
+
+            res.send({
+                success: true,
+                modifiedCount: result.modifiedCount,
+            });
+
+        });
+        app.delete("/api/admin/books/:id", async (req, res) => {
+
+            const { id } = req.params;
+
+            const result = await booksCollections.deleteOne({
+
+                _id: new ObjectId(id)
+
+            });
+
+            res.send({
+                success: true,
+                deletedCount: result.deletedCount,
+            });
+
+        });
+
+
         // users related api 
         app.get("/api/admin/user", async (req, res) => {
             try {
