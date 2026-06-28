@@ -3,7 +3,7 @@ dns.setServers(["1.1.1.1", "8.8.8.8"]);
 const express = require('express');
 require('dotenv').config()
 const cors = require("cors")
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000
 
@@ -29,6 +29,73 @@ async function run() {
 
         const db = client.db("bibilio_db")
         const booksCollections = db.collection("books")
+        const usersCollections = db.collection("users");
+        const deliveryCollections = db.collection("bookRequests");
+        const paymentCollections = db.collection("payments");
+
+
+        // admin related api 
+        app.get("/api/dashboard/admin/overview", async (req, res) => {
+            try {
+                // Total Users
+                const totalUsers = await usersCollections.countDocuments();
+                // Total Books
+                const totalBooks = await booksCollections.countDocuments();
+                // Total Deliveries
+                const totalDeliveries = await deliveryCollections.countDocuments();
+                // Total Revenue
+                const payments = await paymentCollections.find().toArray();
+                const totalRevenue = payments.reduce((sum, payment) => {
+                    return sum + Number(payment.amount || 0);
+                }, 0);
+                // Books by Category (Pie Chart)
+                const categoryAggregation = await booksCollections.aggregate([
+                    {
+                        $match: {
+                            status: "Published",
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: "$category",
+                            value: {
+                                $sum: 1,
+                            },
+                        },
+                    },
+                    {
+                        $sort: {
+                            value: -1,
+                        },
+                    },
+                ]).toArray();
+
+                const categoryData = categoryAggregation.map((item) => ({
+                    name: item._id,
+                    value: item.value,
+                }));
+
+                res.status(200).send({
+                    success: true,
+                    stats: {
+                        totalUsers,
+                        totalBooks,
+                        totalDeliveries,
+                        totalRevenue,
+                    },
+                    categories: categoryData,
+                });
+
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
 
 
         app.get("/api/books", async (req, res) => {
@@ -106,6 +173,32 @@ async function run() {
                     success: false,
                     message: "Internal Server Error",
                 });
+            }
+        });
+
+
+        app.get("/api/books/:id", async (req, res) => {
+            try {
+                const { id } = req.params;
+
+                if (!ObjectId.isValid(id)) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "Invalid Book ID"
+                    });
+                }
+
+                const book = await booksCollections.findOne({
+                    _id: new ObjectId(id)
+                });
+
+                res.send({
+                    success: true,
+                    book
+                });
+
+            } catch (error) {
+                console.log(error);
             }
         });
         // add book related api 
@@ -228,6 +321,35 @@ async function run() {
                 res.send({
                     success: true,
                     books,
+                });
+            } catch (error) {
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Internal Server Error",
+                });
+            }
+        });
+
+
+
+        // feature related api 
+        app.get("/api/books/featured", async (req, res) => {
+            try {
+                const featuredBooks = await booksCollections
+                    .find({
+                        status: "Published",
+                    })
+                    .sort({
+                        createdAt: -1,
+                    })
+                    .limit(6)
+                    .toArray();
+
+                res.send({
+                    success: true,
+                    books: featuredBooks,
                 });
             } catch (error) {
                 console.log(error);
