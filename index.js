@@ -16,7 +16,12 @@ app.use(cors())
 app.use(express.json())
 const uri = process.env.MONGODB_URI;
 
-console.log(uri)
+const Stripe = require("stripe");
+const stripe = new Stripe(
+    process.env.STRIPE_SECRET_KEY
+);
+
+
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -36,7 +41,122 @@ async function run() {
         const paymentCollections = db.collection("payments");
 
 
+        //stripe api 
+        app.post("/api/create-checkout-session", async (req, res) => {
+            try {
+                const {
+                    title,
+                    deliveryFee,
+                    bookId,
+                } = req.body;
 
+                const session = await stripe.checkout.sessions.create({
+                    mode: "payment",
+
+                    payment_method_types: ["card"],
+
+                    line_items: [
+                        {
+                            price_data: {
+                                currency: "bdt",
+
+                                product_data: {
+                                    name: title,
+                                },
+
+                                unit_amount: Math.round(Number(deliveryFee) * 100),
+                            },
+
+                            quantity: 1,
+                        },
+                    ],
+
+                    success_url: `${process.env.CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}&bookId=${bookId}`,
+
+                    cancel_url: `${process.env.CLIENT_URL}/payment/cancel`,
+                });
+
+                res.send({
+                    success: true,
+                    url: session.url,
+                });
+
+            } catch (error) {
+
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: error.message,
+                });
+
+            }
+        });
+
+        app.post("/api/payments/success", verifyJWT, async (req, res) => {
+            try {
+                const { bookId, sessionId } = req.body;
+
+                const session = await stripe.checkout.sessions.retrieve(
+                    sessionId
+                );
+
+                if (session.payment_status !== "paid") {
+                    return res.send({
+                        success: false,
+                        message: "Payment not completed",
+                    });
+                }
+
+                const book = await booksCollection.findOne({
+                    _id: new ObjectId(bookId),
+                });
+
+                if (!book) {
+                    return res.send({
+                        success: false,
+                        message: "Book not found",
+                    });
+                }
+
+                await booksCollection.updateOne(
+                    {
+                        _id: new ObjectId(bookId),
+                    },
+                    {
+                        $set: {
+                            status: "Pending Delivery",
+                        },
+                    }
+                );
+
+                await deliveriesCollection.insertOne({
+                    bookId,
+                    title: book.title,
+                    image: book.image,
+                    deliveryFee: book.deliveryFee,
+                    readerEmail: req.user.email,
+                    librarianEmail: book.librarianEmail,
+                    status: "Pending",
+                    paymentStatus: "Paid",
+                    createdAt: new Date(),
+                });
+
+                res.send({
+                    success: true,
+                });
+
+            } catch (error) {
+
+                console.log(error);
+
+                res.status(500).send({
+                    success: false,
+                    message: "Payment verification failed",
+                });
+
+            }
+        });
 
         // manage books related api
 
