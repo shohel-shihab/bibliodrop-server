@@ -212,7 +212,7 @@ async function run() {
                     }
                 );
 
-                await deliveriesCollection.insertOne({
+                await deliveryCollections.insertOne({
                     bookId,
                     title: book.title,
                     image: book.image,
