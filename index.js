@@ -1,6 +1,7 @@
 const dns = require("node:dns");
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 const express = require('express');
+const { createRemoteJWKSet, jwtVerify } = require("jose");
 require('dotenv').config()
 const cors = require("cors")
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -22,7 +23,6 @@ const uri = process.env.MONGODB_URI;
 
 
 const Stripe = require("stripe");
-const { createRemoteJWKSet, jwtVerify } = require("jose");
 const stripe = new Stripe(
     process.env.STRIPE_SECRET_KEY
 );
@@ -62,54 +62,6 @@ const verifyToken = async (req, res, next) => {
 
 
 }
-
-// Role-based Middleware Functions
-const verifyUser = (req, res, next) => {
-    if (!req.user) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authentication required',
-        });
-    }
-    next();
-};
-
-const verifyLibrarian = (req, res, next) => {
-    if (!req.user) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authentication required',
-        });
-    }
-
-    const role = req.user.role?.toLowerCase();
-    if (role !== 'librarian' && role !== 'admin') {
-        return res.status(403).json({
-            success: false,
-            message: 'Access denied. Librarian or Admin role required.',
-        });
-    }
-    next();
-};
-
-const verifyAdmin = (req, res, next) => {
-    if (!req.user) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authentication required',
-        });
-    }
-
-    if (req.user.role?.toLowerCase() !== 'admin') {
-        return res.status(403).json({
-            success: false,
-            message: 'Access denied. Admin role required.',
-        });
-    }
-    next();
-};
-
-
 
 async function run() {
     try {
@@ -242,7 +194,7 @@ async function run() {
 
         // manage books related api
 
-        app.get("/api/admin/books", verifyToken, verifyLibrarian, async (req, res) => {
+        app.get("/api/admin/books", async (req, res) => {
             try {
                 const books = await booksCollections
                     .find({})
@@ -342,7 +294,7 @@ async function run() {
 
 
         // users related api 
-        app.get("/api/admin/user", async (req, res) => {
+        app.get("/api/admin/user",verifyToken, async (req, res) => {
             try {
                 const users = await usersCollections
                     .find({})
@@ -364,7 +316,7 @@ async function run() {
             }
         });
         //pending related api 
-        app.get("/api/admin/pending-books", async (req, res) => {
+        app.get("/api/admin/pending-books",verifyToken, async (req, res) => {
             try {
                 const books = await booksCollections
                     .find({
@@ -389,7 +341,7 @@ async function run() {
             }
         });
         // admin related api 
-        app.get("/api/dashboard/admin/overview", async (req, res) => {
+        app.get("/api/dashboard/admin/overview",verifyToken, async (req, res) => {
             try {
                 // Total Users
                 const totalUsers = await usersCollections.countDocuments();
