@@ -7,14 +7,12 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000
 
-//bibiliodropDB
-//k1p3APvf6mDWHuYO
-console.log("hello")
+
 
 //middleware 
 app.use(
     cors({
-        origin: "http://localhost:3000",
+        origin: process.env.CLIENT_URL,
         credentials: true,
     })
 );
@@ -24,7 +22,7 @@ const uri = process.env.MONGODB_URI;
 
 
 const Stripe = require("stripe");
-const { createRemoteJWKSet } = require("jose");
+const { createRemoteJWKSet, jwtVerify } = require("jose");
 const stripe = new Stripe(
     process.env.STRIPE_SECRET_KEY
 );
@@ -54,7 +52,7 @@ const verifyToken = async (req, res, next) => {
     }
     try {
         const { payload } = await jwtVerify(token, JWKS)
-        console.log(payload)
+        req.user = payload;
         next()
     }
     catch (error) {
@@ -192,7 +190,7 @@ async function run() {
                     });
                 }
 
-                const book = await booksCollection.findOne({
+                const book = await booksCollections.findOne({
                     _id: new ObjectId(bookId),
                 });
 
@@ -203,7 +201,7 @@ async function run() {
                     });
                 }
 
-                await booksCollection.updateOne(
+                await booksCollections.updateOne(
                     {
                         _id: new ObjectId(bookId),
                     },
@@ -244,7 +242,7 @@ async function run() {
 
         // manage books related api
 
-        app.get("/api/admin/books",verifyToken,verifyLibrarian, async (req, res) => {
+        app.get("/api/admin/books", verifyToken, verifyLibrarian, async (req, res) => {
             try {
                 const books = await booksCollections
                     .find({})
@@ -793,9 +791,9 @@ async function run() {
 
 
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
@@ -811,10 +809,14 @@ run().catch(console.dir);
 
 
 
-app.get('/', (req, res) => {
-    res.send('Hello bibliodrop!');
+app.get("/", (req, res) => {
+    res.send("BiblioDrop Server is Running");
 });
 
-app.listen(port, () => {
-    console.log(`bibliodrop server is running on port ${port}`);
-});
+module.exports = app;
+
+if (process.env.NODE_ENV !== "production") {
+    app.listen(port, () => {
+        console.log(`Server running on ${port}`);
+    });
+}
