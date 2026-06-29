@@ -65,6 +65,52 @@ const verifyToken = async (req, res, next) => {
 
 }
 
+// Role-based Middleware Functions
+const verifyUser = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication required',
+        });
+    }
+    next();
+};
+
+const verifyLibrarian = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication required',
+        });
+    }
+
+    const role = req.user.role?.toLowerCase();
+    if (role !== 'librarian' && role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. Librarian or Admin role required.',
+        });
+    }
+    next();
+};
+
+const verifyAdmin = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication required',
+        });
+    }
+
+    if (req.user.role?.toLowerCase() !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            message: 'Access denied. Admin role required.',
+        });
+    }
+    next();
+};
+
 
 
 async function run() {
@@ -198,7 +244,7 @@ async function run() {
 
         // manage books related api
 
-        app.get("/api/admin/books", async (req, res) => {
+        app.get("/api/admin/books",verifyToken,verifyLibrarian, async (req, res) => {
             try {
                 const books = await booksCollections
                     .find({})
